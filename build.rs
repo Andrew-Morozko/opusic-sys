@@ -127,6 +127,12 @@ fn build() {
         remove_lto_options(&mut cmake);
     }
 
+    let opt_level = std::env::var("OPT_LEVEL");
+    let opt_level = opt_level.as_deref().unwrap_or_else(|err| {
+        println!("cargo:warning=OPT_LEVEL error: {err:?}, assuming release");
+        "3"
+    });
+
     cmake.define("OPUS_INSTALL_PKG_CONFIG_MODULE", "OFF")
          .define("OPUS_INSTALL_CMAKE_CONFIG_MODULE", "OFF")
          //Defining these variables disable GNUInstallDirs so in addition to /lib
@@ -138,7 +144,16 @@ fn build() {
          .define("CMAKE_INSTALL_LIBDIR", "lib")
          .define("CMAKE_TRY_COMPILE_TARGET_TYPE", "STATIC_LIBRARY")
          .define("CMAKE_INTERPROCEDURAL_OPTIMIZATION", to_opt(rust_lto))
-    ;
+         .define("CMAKE_BUILD_TYPE", match opt_level {
+             "s" | "z" => "MinSizeRel",
+             // Using release build even in debug to decrease the number of rebuilds
+             // Standard CMAKE_BUILD_TYPEs: "Release", "MinSizeRel", "RelWithDebInfo", "Debug"
+             "0" | "1" | "2" | "3" => "Release",
+             other => {
+                 println!("cargo:warning=unexpected OPT_LEVEL='{other}', assuming release");
+                 "Release"
+             }
+         });
 
     //Keep this up to date with Cargo.toml
     cmake.define("OPUS_DRED", to_opt(cfg!(feature = "dred")))
