@@ -141,27 +141,13 @@ fn build() {
     ;
 
     //Keep this up to date with Cargo.toml
-    if cfg!(feature = "dred") {
-        cmake.define("OPUS_DRED", "ON");
-    }
-    if cfg!(feature = "osce") {
-        cmake.define("OPUS_OSCE", "ON");
-    }
-    if cfg!(feature = "no-hardening") {
-        cmake.define("OPUS_HARDENING", "OFF");
-    }
-    if cfg!(feature = "no-stack-protector") {
-        cmake.define("OPUS_STACK_PROTECTOR", "OFF");
-    }
-    if cfg!(feature = "no-fortify-source") {
-        cmake.define("OPUS_FORTIFY_SOURCE", "OFF");
-    }
-    if cfg!(feature = "no-simd") {
-        cmake.define("OPUS_DISABLE_INTRINSICS", "ON");
-    }
-    if cfg!(feature = "fixed-point") {
-        cmake.define("OPUS_FIXED_POINT", "ON");
-    }
+    cmake.define("OPUS_DRED", to_opt(cfg!(feature = "dred")))
+         .define("OPUS_OSCE", to_opt(cfg!(feature = "osce")))
+         .define("OPUS_HARDENING", to_opt(cfg!(not(feature = "no-hardening"))))
+         .define("OPUS_STACK_PROTECTOR", to_opt(cfg!(not(feature = "no-stack-protector"))))
+         .define("OPUS_FORTIFY_SOURCE", to_opt(cfg!(not(feature = "no-fortify-source"))))
+         .define("OPUS_DISABLE_INTRINSICS", to_opt(cfg!(feature = "no-simd")))
+         .define("OPUS_FIXED_POINT", to_opt(cfg!(feature = "fixed-point")));
 
     if let Some((toolchain_file, abi)) = get_android_vars() {
         cmake.define("CMAKE_TOOLCHAIN_FILE", toolchain_file);
