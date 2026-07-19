@@ -121,6 +121,51 @@ fn build() {
         }
     }
 
+    fn configure_cpu_features(cmake: &mut cmake::Config) {
+        const DO_RUNTIME_DETECTION: bool = cfg!(not(feature = "no-runtime-feature-detection"));
+
+        let Ok(target_features) = std::env::var("CARGO_CFG_TARGET_FEATURE") else {
+            return;
+        };
+
+        match std::env::var("CARGO_CFG_TARGET_ARCH").as_deref() {
+            Ok("aarch64") | Ok("arm") => {
+                // TODO: feature detection on other arm flags?
+                // OPUS_ARM_PRESUME_DOTPROD, OPUS_ARM_PRESUME_EDSP, OPUS_ARM_PRESUME_MEDIA
+                let has_neon = target_features.split(',').any(|s| s.trim() == "neon");
+
+                cmake
+                    .define("OPUS_ARM_PRESUME_NEON", to_opt(has_neon))
+                    .define("OPUS_ARM_MAY_HAVE_NEON", to_opt(DO_RUNTIME_DETECTION));
+            }
+            Ok("x86_64") | Ok("x86") => {
+                let [mut has_sse, mut has_sse2, mut has_sse41, mut has_avx2, mut has_fma] = [false; _];
+
+                for feat in target_features.split(',').map(|s| s.trim()) {
+                    match feat {
+                        "sse" => has_sse = true,
+                        "sse2" => has_sse2 = true,
+                        "sse4.1" => has_sse41 = true,
+                        "avx2" => has_avx2 = true,
+                        "fma" => has_fma = true,
+                        _ => {}
+                    }
+                }
+
+                cmake
+                    .define("OPUS_X86_PRESUME_SSE", to_opt(has_sse))
+                    .define("OPUS_X86_PRESUME_SSE2", to_opt(has_sse2))
+                    .define("OPUS_X86_PRESUME_SSE4_1", to_opt(has_sse41))
+                    .define("OPUS_X86_PRESUME_AVX2", to_opt(has_avx2 && has_fma))
+                    .define("OPUS_X86_MAY_HAVE_SSE", to_opt(DO_RUNTIME_DETECTION))
+                    .define("OPUS_X86_MAY_HAVE_SSE2", to_opt(DO_RUNTIME_DETECTION))
+                    .define("OPUS_X86_MAY_HAVE_SSE4_1", to_opt(DO_RUNTIME_DETECTION))
+                    .define("OPUS_X86_MAY_HAVE_AVX2", to_opt(DO_RUNTIME_DETECTION));
+            }
+            _ => {}
+        }
+    }
+
     let mut cmake = cmake::Config::new(CURRENT_DIR);
     let rust_lto = std::env::var("CARGO_ENCODED_RUSTFLAGS").is_ok_and(|opt| opt.contains("linker-plugin-lto"));
     if !rust_lto {
@@ -163,6 +208,8 @@ fn build() {
          .define("OPUS_FORTIFY_SOURCE", to_opt(cfg!(not(feature = "no-fortify-source"))))
          .define("OPUS_DISABLE_INTRINSICS", to_opt(cfg!(feature = "no-simd")))
          .define("OPUS_FIXED_POINT", to_opt(cfg!(feature = "fixed-point")));
+
+    configure_cpu_features(&mut cmake);
 
     if let Some((toolchain_file, abi)) = get_android_vars() {
         cmake.define("CMAKE_TOOLCHAIN_FILE", toolchain_file);
