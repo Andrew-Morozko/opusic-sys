@@ -30,7 +30,7 @@ fn generate_lib() {
     let out = path::PathBuf::new().join("src").join("lib.rs");
 
     let bindings = bindgen::Builder::default().header("src/wrapper.h")
-                                              .raw_line(PREPEND_LIB)
+                                              .raw_line(PREPEND_LIB.trim_ascii())
                                               .parse_callbacks(Box::new(ParseCallbacks))
                                               .generate_comments(false)
                                               .layout_tests(false)
@@ -39,6 +39,7 @@ fn generate_lib() {
                                               .allowlist_function("[oO]pus.+")
                                               .allowlist_var("[oO].+")
                                               .use_core()
+                                              .rustfmt_configuration_file(Some("bindgen.rustfmt.toml".into()))
                                               .generate()
                                               .expect("Unable to generate bindings");
 
