@@ -94,7 +94,7 @@ fn build() {
     //Disable LTO if someone tries to force it (e.g. Arch makepkg)
     //This is necessary because cmake crate doesn't pass env variables at configure step, so we will
     //adjust both configure variables and general build env (just in case)
-    fn fix_build_env(cmake: &mut cmake::Config) {
+    fn remove_lto_options(cmake: &mut cmake::Config) {
         for (var, cmake_var) in [("CFLAGS", "CMAKE_C_FLAGS"), ("CXXFLAGS", "CMAKE_CXX_FLAGS")] {
             if let Ok(value) = std::env::var(var) {
                 if value.contains("-flto") {
@@ -112,8 +112,21 @@ fn build() {
         }
     }
 
+    //Converts bool to cmake's "ON/OFF"
+    fn to_opt(val: bool) -> &'static str {
+        if val {
+            "ON"
+        } else {
+            "OFF"
+        }
+    }
+
     let mut cmake = cmake::Config::new(CURRENT_DIR);
-    fix_build_env(&mut cmake);
+    let rust_lto = std::env::var("CARGO_ENCODED_RUSTFLAGS").is_ok_and(|opt| opt.contains("linker-plugin-lto"));
+    if !rust_lto {
+        remove_lto_options(&mut cmake);
+    }
+
     cmake.define("OPUS_INSTALL_PKG_CONFIG_MODULE", "OFF")
          .define("OPUS_INSTALL_CMAKE_CONFIG_MODULE", "OFF")
          //Defining these variables disable GNUInstallDirs so in addition to /lib
@@ -124,8 +137,8 @@ fn build() {
          .define("CMAKE_INSTALL_OLDINCLUDEDIR", "include")
          .define("CMAKE_INSTALL_LIBDIR", "lib")
          .define("CMAKE_TRY_COMPILE_TARGET_TYPE", "STATIC_LIBRARY")
-         //Ensure opus's CMake never enables LTO
-         .define("CMAKE_INTERPROCEDURAL_OPTIMIZATION", "off");
+         .define("CMAKE_INTERPROCEDURAL_OPTIMIZATION", to_opt(rust_lto))
+    ;
 
     //Keep this up to date with Cargo.toml
     if cfg!(feature = "dred") {
