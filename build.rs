@@ -139,7 +139,11 @@ fn build() {
                     .define("OPUS_ARM_MAY_HAVE_NEON", to_opt(DO_RUNTIME_DETECTION));
             }
             Ok("x86_64") | Ok("x86") => {
-                let [mut has_sse, mut has_sse2, mut has_sse41, mut has_avx2, mut has_fma] = [false; _];
+                let mut has_sse = false;
+                let mut has_sse2 = false;
+                let mut has_sse41 = false;
+                let mut has_avx2 = false;
+                let mut has_fma = false;
 
                 for feat in target_features.split(',').map(|s| s.trim()) {
                     match feat {
