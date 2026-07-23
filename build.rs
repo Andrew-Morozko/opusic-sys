@@ -124,9 +124,10 @@ fn build() {
     fn configure_cpu_features(cmake: &mut cmake::Config) {
         const DO_RUNTIME_DETECTION: bool = cfg!(not(feature = "no-runtime-feature-detection"));
 
-        let Ok(target_features) = std::env::var("CARGO_CFG_TARGET_FEATURE") else {
-            return;
-        };
+        let target_features = std::env::var("CARGO_CFG_TARGET_FEATURE").unwrap_or_else(|err| {
+            println!("cargo:warning=failed to get CARGO_CFG_TARGET_FEATURE: {err:?}. Assuming no features are guaranteed");
+            String::new()
+        });
 
         match std::env::var("CARGO_CFG_TARGET_ARCH").as_deref() {
             Ok("aarch64") | Ok("arm") => {
@@ -165,6 +166,9 @@ fn build() {
                     .define("OPUS_X86_MAY_HAVE_SSE2", to_opt(DO_RUNTIME_DETECTION))
                     .define("OPUS_X86_MAY_HAVE_SSE4_1", to_opt(DO_RUNTIME_DETECTION))
                     .define("OPUS_X86_MAY_HAVE_AVX2", to_opt(DO_RUNTIME_DETECTION));
+            }
+            Err(err) => {
+                println!("cargo:warning=failed to get CARGO_CFG_TARGET_ARCH: {err:?}. CPU feature configuration is left up to CMake");
             }
             _ => {}
         }
